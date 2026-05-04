@@ -301,3 +301,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+    # Keep window open
+    input("\n[*] Press ENTER to exit...")
+
