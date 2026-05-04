@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-NEXORA Amazon Product Scraper
-=============================
-احط لينك المنتج من Amazon - السكريبت ده هيسحب:
+NEXORA Amazon Product Scraper v2 - Playwright Edition
+======================================================
+السكريبت ده بيفتح Chrome حقيقي ويسحب بيانات المنتج من Amazon تلقائياً:
   - اسم المنتج
   - السعر الحالي
-  - رابط الصورة الرئيسية
+  - الصورة الرئيسية بأعلى جودة
   - التقييم وعدد الريفيوز
-  - وصف المنتج
-وبعدين يولد كود HTML جاهز تحطه في index.html
+  - أهم مميزات المنتج
+  - بيولّد كود HTML جاهز تحطه في الموقع
 
 التشغيل:
-  pip install requests beautifulsoup4 lxml
+  pip install playwright
+  playwright install chromium
   python amazon_scraper.py
 """
 
@@ -20,260 +22,235 @@ import sys
 import json
 import time
 import random
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urlparse, urlencode, parse_qs
+import asyncio
+from pathlib import Path
+
+try:
+    from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+except ImportError:
+    print("[!] Playwright مش مثبّت. شغّل الأمر ده:")
+    print("    pip install playwright && playwright install chromium")
+    sys.exit(1)
 
 # ============================================================
-# الإعدادات - عدّل TAG بتاعك هنا
+# الإعدادات
 # ============================================================
 AFFILIATE_TAG = "kareemelsay0a-20"
+HEADLESS = False   # False = بيفتح نافذة Chrome تشوفها, True = بيشتغل في الخلفية
 
-HEADERS_LIST = [
-    {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Cache-Control": "max-age=0",
-    },
-    {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-]
 
 # ============================================================
 # دوال مساعدة
 # ============================================================
 
-def clean_amazon_url(url: str) -> str:
-    """استخرج ASIN من الرابط واعمل رابط أفلييت نظيف"""
-    # استخرج ASIN
-    asin_match = re.search(r'/dp/([A-Z0-9]{10})', url)
-    if not asin_match:
-        asin_match = re.search(r'/gp/product/([A-Z0-9]{10})', url)
-    if not asin_match:
-        print("[!] مش قادر ألاقي ASIN في الرابط ده")
-        return url
-
-    asin = asin_match.group(1)
-    clean = f"https://www.amazon.com/dp/{asin}?tag={AFFILIATE_TAG}&linkCode=ogi&th=1&psc=1"
-    return clean, asin
+def extract_asin(url: str) -> str | None:
+    """استخرج ASIN من أي رابط Amazon"""
+    m = re.search(r'/dp/([A-Z0-9]{10})', url)
+    if not m:
+        m = re.search(r'/gp/product/([A-Z0-9]{10})', url)
+    if not m:
+        m = re.search(r'[?&]asin=([A-Z0-9]{10})', url)
+    return m.group(1) if m else None
 
 
-def fetch_page(url: str) -> BeautifulSoup | None:
-    """اجلب صفحة Amazon مع headers متنوعة"""
-    headers = random.choice(HEADERS_LIST)
-    # Force US location
-    cookies = {"i18n-prefs": "USD", "lc-main": "en_US"}
+def build_affiliate_url(asin: str) -> str:
+    return f"https://www.amazon.com/dp/{asin}?tag={AFFILIATE_TAG}&linkCode=ogi&th=1&psc=1"
 
+
+def rating_to_stars(rating: str) -> str:
     try:
-        print(f"[*] جاري تحميل الصفحة...")
-        resp = requests.get(url, headers=headers, cookies=cookies, timeout=15)
-        if resp.status_code != 200:
-            print(f"[!] Status code: {resp.status_code}")
-            return None
-        return BeautifulSoup(resp.text, "lxml")
-    except Exception as e:
-        print(f"[!] خطأ في الاتصال: {e}")
-        return None
-
-
-def extract_title(soup: BeautifulSoup) -> str:
-    selectors = [
-        ("span", {"id": "productTitle"}),
-        ("h1", {"id": "title"}),
-        ("span", {"class": "product-title-word-break"}),
-    ]
-    for tag, attrs in selectors:
-        el = soup.find(tag, attrs)
-        if el:
-            return el.get_text(strip=True)
-    return "Unknown Product"
-
-
-def extract_price(soup: BeautifulSoup) -> str:
-    # محاولة 1: السعر الحالي
-    price_el = soup.find("span", {"class": "a-price-whole"})
-    frac_el = soup.find("span", {"class": "a-price-fraction"})
-    if price_el:
-        whole = price_el.get_text(strip=True).replace(",", "")
-        frac = frac_el.get_text(strip=True) if frac_el else "00"
-        return f"${whole}{frac}"
-
-    # محاولة 2: corePriceDisplay
-    for span in soup.find_all("span", {"class": "a-offscreen"}):
-        txt = span.get_text(strip=True)
-        if txt.startswith("$") and len(txt) < 15:
-            return txt
-
-    # محاولة 3: basisPrice
-    el = soup.find("span", {"id": "priceblock_ourprice"})
-    if el:
-        return el.get_text(strip=True)
-
-    return "Check Amazon"
-
-
-def extract_rating(soup: BeautifulSoup) -> tuple[str, str]:
-    """Returns (rating_str, review_count)"""
-    rating = "N/A"
-    count = "0"
-
-    # Rating
-    el = soup.find("span", {"data-hook": "rating-out-of-text"})
-    if not el:
-        el = soup.find("i", {"data-hook": "average-star-rating"})
-    if el:
-        txt = el.get_text(strip=True)
-        m = re.search(r'([\d\.]+)', txt)
-        if m:
-            rating = m.group(1)
-
-    # Count
-    el2 = soup.find("span", {"id": "acrCustomerReviewText"})
-    if el2:
-        count_txt = el2.get_text(strip=True).replace(",", "").split()[0]
-        count = count_txt
-
-    return rating, count
-
-
-def rating_to_stars(rating_str: str) -> str:
-    """حوّل الرقم لنجوم Unicode"""
-    try:
-        r = float(rating_str)
-    except ValueError:
-        return "★★★★☆"
-    full = int(r)
-    half = 1 if (r - full) >= 0.5 else 0
+        r = float(rating)
+    except (ValueError, TypeError):
+        return "\u2605\u2605\u2605\u2605\u2606"
+    full  = int(r)
+    half  = 1 if (r - full) >= 0.5 else 0
     empty = 5 - full - half
-    return "★" * full + ("½" if half else "") + "☆" * empty
+    return "\u2605" * full + ("\u00bd" if half else "") + "\u2606" * empty
 
 
-def extract_main_image(soup: BeautifulSoup) -> str:
-    """استخرج أعلى جودة للصورة الرئيسية"""
-    # محاولة 1: data في script tag
-    scripts = soup.find_all("script", {"type": "text/javascript"})
-    for script in scripts:
-        if script.string and "ImageBlockATF" in script.string:
-            m = re.search(r'"hiRes":"(https://[^"]+)"', script.string)
-            if m:
-                return m.group(1)
-            m = re.search(r'"large":"(https://m\.media-amazon\.com[^"]+)"', script.string)
-            if m:
-                return m.group(1)
-
-    # محاولة 2: landingImage
-    img = soup.find("img", {"id": "landingImage"})
-    if img:
-        # جرب data-old-hires أولاً (أعلى جودة)
-        src = img.get("data-old-hires") or img.get("src", "")
-        if src and src.startswith("http"):
-            # حوّل للـ SL1500 عشان أعلى جودة
-            src = re.sub(r'_[A-Z]{2}\d+_', '_SL1500_', src)
-            return src
-
-    # محاولة 3: imgTagWrapperId
-    img2 = soup.find("img", {"id": "main-image"})
-    if img2:
-        return img2.get("src", "")
-
-    return ""
+def guess_category(title: str) -> tuple:
+    t = title.lower()
+    if any(w in t for w in ["pet","dog","cat","collar","leash","paw","bird","fish","aquarium"]):
+        return "\ud83d\udc3e Pets", "pets"
+    if any(w in t for w in ["beauty","skin","hair","lip","serum","cream","makeup","face","moisturizer","perfume","fragrance"]):
+        return "\u2728 Beauty", "beauty"
+    if any(w in t for w in ["phone","laptop","usb","cable","wireless","bluetooth","speaker","headphone","earphone","earbuds","monitor","keyboard","mouse","camera","tablet","charger","battery","alexa","echo","kindle","gaming","router"]):
+        return "\u26a1 Tech", "tech"
+    return "\ud83c\udfe0 Home", "home"
 
 
-def extract_description(soup: BeautifulSoup) -> list[str]:
-    """استخرج أهم نقاط المنتج (bullet points)"""
-    bullets = []
-    feature_div = soup.find("div", {"id": "feature-bullets"})
-    if feature_div:
-        items = feature_div.find_all("li")
-        for item in items[:5]:  # أول 5 نقاط بس
-            txt = item.get_text(strip=True)
-            if txt and "Make sure" not in txt:
-                bullets.append(txt)
-    return bullets
+# ============================================================
+# السكريبت الرئيسي
+# ============================================================
 
-
-def guess_category(title: str) -> tuple[str, str]:
-    """خمّن الكاتيجوري من اسم المنتج"""
-    title_lower = title.lower()
-    if any(w in title_lower for w in ["pet", "dog", "cat", "collar", "leash", "paw"]):
-        return "🐾 Pets Pick", "pets"
-    elif any(w in title_lower for w in ["beauty", "skin", "hair", "lip", "serum", "cream", "makeup", "face"]):
-        return "✨ Beauty Pick", "beauty"
-    elif any(w in title_lower for w in ["phone", "laptop", "usb", "cable", "wireless", "bluetooth", "tech", "gadget", "camera", "headphone", "earphone"]):
-        return "⚡ Tech Pick", "tech"
-    else:
-        return "🏠 Home Pick", "home"
-
-
-def generate_html_card(product: dict) -> str:
-    """ولّد كود HTML بطاقة المنتج الجاهزة للموقع"""
-    badge_text, category = guess_category(product["title"])
-    stars = rating_to_stars(product["rating"])
-
-    # اختصر العنوان لو طويل
-    short_title = product["title"]
-    if len(short_title) > 120:
-        short_title = short_title[:117] + "..."
-
-    # Bullet points (لو موجودين)
-    bullets_html = ""
-    if product["bullets"]:
-        items = "".join(f"<li>{b}</li>" for b in product["bullets"][:3])
-        bullets_html = f'<ul class="product-bullets">{items}</ul>'
-
-    card = f"""
-      <!-- PRODUCT: {product['asin']} - {product['title'][:50]} -->
-      <div class="product-card">
-        <img src="{product['image']}" alt="{short_title}" loading="lazy"/>
-        <div class="product-info">
-          <span class="product-badge">{badge_text}</span>
-          <h3 class="product-title">{short_title}</h3>
-          <div class="product-rating">{stars} <span>{product['rating']} ({product['review_count']} reviews)</span></div>
-          {bullets_html}
-          <div class="product-price"><span class="currency">$</span>{product['price_clean']}</div>
-          <a href="{product['affiliate_url']}" class="buy-btn" target="_blank" rel="noopener noreferrer">
-            🛒 Buy on Amazon
-          </a>
-        </div>
-      </div>"""
-    return card
-
-
-def scrape_product(url: str) -> dict | None:
-    """السكريبت الرئيسي: اسحب كل بيانات المنتج"""
-    result = clean_amazon_url(url)
-    if isinstance(result, str):
+async def scrape_amazon(url: str) -> dict | None:
+    asin = extract_asin(url)
+    if not asin:
+        print("[!] مش قادر ألاقي ASIN في الرابط ده")
+        print("    تأكد إن الرابط من Amazon وفيه /dp/XXXXXXXXXX")
         return None
-    affiliate_url, asin = result
 
+    affiliate_url = build_affiliate_url(asin)
     print(f"[*] ASIN: {asin}")
-    print(f"[*] Affiliate URL: {affiliate_url}")
+    print(f"[*] URL:  {affiliate_url}")
+    print("[*] جاري فتح المتصفح...")
 
-    # تحميل الصفحة
-    time.sleep(random.uniform(1, 2))  # تأخير بسيط عشان ما يتحجبش
-    soup = fetch_page(affiliate_url)
-    if not soup:
-        print("[!] فشل تحميل الصفحة")
-        return None
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=HEADLESS,
+            args=[
+                "--no-sandbox",
+                "--disable-blink-features=AutomationControlled",
+                "--lang=en-US",
+            ]
+        )
 
-    # استخراج البيانات
-    print("[*] جاري استخراج البيانات...")
-    title   = extract_title(soup)
-    price   = extract_price(soup)
-    rating, review_count = extract_rating(soup)
-    image   = extract_main_image(soup)
-    bullets = extract_description(soup)
+        ctx = await browser.new_context(
+            locale="en-US",
+            timezone_id="America/New_York",
+            viewport={"width": 1366, "height": 768},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"}
+        )
 
-    # تنظيف السعر
-    price_clean = price.replace("$", "").replace(",", "").strip()
-    if price_clean == "Check Amazon":
-        price_clean = "Check Amazon"
+        # تعطيل علامات الأتمتة
+        await ctx.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            window.chrome = { runtime: {} };
+        """)
+
+        page = await ctx.new_page()
+
+        # ضبط cookies عشان يظهر بالدولار الأمريكي
+        await ctx.add_cookies([
+            {"name": "i18n-prefs", "value": "USD",   "domain": ".amazon.com", "path": "/"},
+            {"name": "lc-main",   "value": "en_US", "domain": ".amazon.com", "path": "/"},
+        ])
+
+        print("[*] جاري تحميل صفحة المنتج...")
+        try:
+            await page.goto(affiliate_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(random.randint(2000, 3500))
+        except PlaywrightTimeout:
+            print("[!] انتهت مدة الانتظار. جرب تاني أو تأكد من الاتصال.")
+            await browser.close()
+            return None
+
+        # ---- استخراج الاسم ----
+        title = ""
+        for sel in ["#productTitle", "h1#title span", "span.product-title-word-break"]:
+            el = page.locator(sel).first
+            if await el.count():
+                title = (await el.inner_text()).strip()
+                break
+        print(f"[+] الاسم: {title[:70]}...")
+
+        # ---- استخراج السعر ----
+        price = ""
+        for sel in [
+            ".a-price.a-text-price.a-size-medium .a-offscreen",
+            "#apex_desktop .a-price .a-offscreen",
+            "#corePrice_desktop .a-offscreen",
+            "#priceblock_ourprice",
+            "#priceblock_dealprice",
+            ".a-price-whole",
+        ]:
+            try:
+                el = page.locator(sel).first
+                if await el.count():
+                    raw = (await el.inner_text()).strip()
+                    if "$" in raw or raw.replace(",","").replace(".","").isdigit():
+                        price = raw.replace("\n","").strip()
+                        break
+            except Exception:
+                continue
+        print(f"[+] السعر: {price}")
+
+        # ---- استخراج التقييم ----
+        rating = ""
+        review_count = ""
+        try:
+            r_el = page.locator("#acrPopover").first
+            if await r_el.count():
+                title_attr = await r_el.get_attribute("title")
+                if title_attr:
+                    m = re.search(r"([\d\.]+)", title_attr)
+                    if m:
+                        rating = m.group(1)
+        except Exception:
+            pass
+
+        try:
+            cnt_el = page.locator("#acrCustomerReviewText").first
+            if await cnt_el.count():
+                review_count = (await cnt_el.inner_text()).strip().replace(",","").split()[0]
+        except Exception:
+            pass
+        print(f"[+] التقييم: {rating} ({review_count} reviews)")
+
+        # ---- استخراج الصورة بأعلى جودة ----
+        image_url = ""
+        try:
+            # محاولة 1: من JS data (أعلى جودة)
+            img_data = await page.evaluate("""
+                () => {
+                    const scripts = document.querySelectorAll('script[type="text/javascript"]');
+                    for (const s of scripts) {
+                        if (s.innerText && s.innerText.includes('ImageBlockATF')) {
+                            const m = s.innerText.match(/"hiRes":"(https:[^"]+)"/);
+                            if (m) return m[1];
+                            const m2 = s.innerText.match(/"large":"(https:\/\/m\.media-amazon[^"]+)"/);
+                            if (m2) return m2[1];
+                        }
+                    }
+                    return null;
+                }
+            """)
+            if img_data:
+                image_url = img_data
+        except Exception:
+            pass
+
+        # محاولة 2: من landingImage
+        if not image_url:
+            try:
+                img_el = page.locator("#landingImage").first
+                if await img_el.count():
+                    src = await img_el.get_attribute("data-old-hires")
+                    if not src:
+                        src = await img_el.get_attribute("src")
+                    if src:
+                        # رفع الجودة لـ SL1500
+                        image_url = re.sub(r'_[A-Z]{2}\d+_', '_SL1500_', src)
+            except Exception:
+                pass
+
+        # محاولة 3: أول صورة في قسم الصور
+        if not image_url:
+            try:
+                img_el = page.locator("#imgTagWrapperId img").first
+                if await img_el.count():
+                    image_url = await img_el.get_attribute("src") or ""
+            except Exception:
+                pass
+
+        print(f"[+] الصورة: {image_url[:80]}...")
+
+        # ---- استخراج مميزات المنتج ----
+        bullets = []
+        try:
+            items = await page.locator("#feature-bullets li span.a-list-item").all_inner_texts()
+            for b in items[:5]:
+                b = b.strip()
+                if b and "Make sure" not in b and len(b) > 10:
+                    bullets.append(b)
+        except Exception:
+            pass
+
+        await browser.close()
+
+    # ---- تجميع البيانات ----
+    price_clean = re.sub(r'[^\d\.]', '', price) if price else "Check Amazon"
 
     product = {
         "asin":          asin,
@@ -282,73 +259,113 @@ def scrape_product(url: str) -> dict | None:
         "price_clean":   price_clean,
         "rating":        rating,
         "review_count":  review_count,
-        "image":         image,
+        "image":         image_url,
         "bullets":       bullets,
         "affiliate_url": affiliate_url,
     }
-
     return product
 
 
-def main():
-    print("=" * 60)
-    print("  NEXORA - Amazon Product Scraper")
-    print("=" * 60)
+def generate_html_card(p: dict) -> str:
+    """ولّد كارد HTML بالـ classes الصح للموقع"""
+    badge_cat, _ = guess_category(p["title"])
+    stars        = rating_to_stars(p["rating"])
+    short_title  = p["title"][:120] + ("..." if len(p["title"]) > 120 else "")
+    price_display = f"${p['price_clean']}" if p['price_clean'] != "Check Amazon" else "Check Amazon"
 
-    # اطلب رابط المنتج
-    url = input("\n[?] الصق رابط المنتج من Amazon: ").strip()
+    # badge type
+    badge_class = "hot"
+    badge_label = "\ud83d\udd25 Hot"
+
+    card = f"""      <!-- PRODUCT: {p['asin']} -->
+      <div class="product-card">
+        <div class="product-img-wrap">
+          <img src="{p['image']}" alt="{short_title}" loading="lazy"/>
+          <span class="product-badge {badge_class}">{badge_label}</span>
+        </div>
+        <div class="product-body">
+          <span class="product-cat">{badge_cat}</span>
+          <h3 class="product-title">{short_title}</h3>
+          <div class="product-stars">
+            <span class="stars">{stars}</span>
+            <span class="rating-count">{p['rating']} ({p['review_count']} reviews)</span>
+          </div>
+        </div>
+        <div class="product-footer">
+          <div>
+            <div class="product-price">{price_display}</div>
+            <div class="price-note">Free Prime Shipping</div>
+          </div>
+          <a href="{p['affiliate_url']}" class="btn-amazon" target="_blank" rel="noopener noreferrer">\ud83d\uded2 Buy Now</a>
+        </div>
+      </div>"""
+    return card
+
+
+async def main():
+    print("\n" + "="*60)
+    print("  NEXORA - Amazon Scraper v2 (Playwright)")
+    print("="*60)
+    print("  الصق رابط المنتج من Amazon (رابط الأفلييت أو العادي)")
+    print("  مثال: https://www.amazon.com/dp/B0FXNXR46R...")
+    print("="*60)
+
+    url = input("\n[?] رابط المنتج: ").strip()
     if not url:
         print("[!] لازم تحط رابط")
         sys.exit(1)
 
-    # اسحب البيانات
-    product = scrape_product(url)
+    product = await scrape_amazon(url)
     if not product:
-        print("\n[!] فشل سحب البيانات. جرب تاني بعد شوية.")
+        print("\n[!] فشل السحب. جرب تاني.")
         sys.exit(1)
 
-    # اعرض النتيجة
-    print("\n" + "=" * 60)
+    print("\n" + "="*60)
     print("  النتيجة:")
-    print("=" * 60)
-    print(f"  الاسم:      {product['title'][:70]}...")
+    print("="*60)
+    print(f"  الاسم:      {product['title'][:65]}...")
     print(f"  السعر:      {product['price']}")
     print(f"  التقييم:    {product['rating']} ({product['review_count']} reviews)")
-    print(f"  الصورة:     {product['image'][:80]}...")
-    print(f"  لينك افليت: {product['affiliate_url']}")
+    print(f"  الصورة:     {product['image'][:70]}...")
     if product['bullets']:
-        print(f"  الـ Features:")
+        print(f"  المميزات:")
         for b in product['bullets']:
             print(f"    - {b[:80]}")
-    print("=" * 60)
+    print("="*60)
 
-    # ولّد HTML
+    # توليد كود HTML
     html_card = generate_html_card(product)
 
-    # احفظ في ملف
-    output_filename = f"product_{product['asin']}.html"
-    with open(output_filename, "w", encoding="utf-8") as f:
-        f.write("<!-- ==========================================\n")
-        f.write("     انسخ الكود ده وحطه في index.html\n")
-        f.write("     داخل <div class=\"products-grid\">\n")
-        f.write("========================================== -->\n")
-        f.write(html_card)
-        f.write("\n<!-- ========================================== -->\n")
+    # حفظ في ملف HTML
+    out_html = Path(f"product_{product['asin']}.html")
+    out_html.write_text(
+        f"""<!-- ================================================
+     انسخ الكود ده وحطه في index.html
+     داخل: <div class="products-grid">
+================================================ -->\n"""
+        + html_card + "\n<!-- ================================================ -->\n",
+        encoding="utf-8"
+    )
 
-    print(f"\n[+] تم الحفظ في ملف: {output_filename}")
-    print(f"[+] افتح الملف ده وانسخ الكود وحطه في قسم products-grid في index.html")
-    print("\n" + "=" * 60)
-    print("  كود HTML الجاهز:")
-    print("=" * 60)
+    # حفظ JSON
+    out_json = Path(f"product_{product['asin']}.json")
+    out_json.write_text(json.dumps(product, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print(f"\n[+] تم الحفظ في: {out_html}")
+    print(f"[+] بيانات JSON:  {out_json}")
+    print("\n" + "="*60)
+    print("  كود HTML الجاهز (انسخه وحطه في index.html):")
+    print("="*60)
     print(html_card)
-    print("=" * 60)
-
-    # احفظ JSON كمان
-    json_file = f"product_{product['asin']}.json"
-    with open(json_file, "w", encoding="utf-8") as f:
-        json.dump(product, f, ensure_ascii=False, indent=2)
-    print(f"[+] بيانات JSON محفوظة في: {json_file}")
+    print("="*60)
+    print("\n[+] خطوات إضافة المنتج للموقع:")
+    print("  1. افتح github.com/karem11/nexora-affiliate")
+    print("  2. افتح index.html > أيقونة القلم")
+    print('  3. دوّر على: <div class="products-grid">')
+    print("  4. ألصق الكارد جوّاه")
+    print("  5. اضغط Commit changes")
+    print("  6. الموقع يتحدث خلال 30 ثانية!")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
