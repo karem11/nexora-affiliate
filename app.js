@@ -4,71 +4,122 @@
 const themeToggle = document.getElementById('themeToggle');
 const html = document.documentElement;
 
-function setTheme(theme) {
-  html.setAttribute('data-theme', theme);
-  localStorage.setItem('nexora-theme', theme);
-  themeToggle.textContent = theme === 'dark' ? '🌙' : '☀️';
-}
+// Check for saved theme preference or default to 'dark'
+const currentTheme = localStorage.getItem('theme') || 'dark';
+html.setAttribute('data-theme', currentTheme);
+themeToggle.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
 
-const savedTheme = localStorage.getItem('nexora-theme') || 'dark';
-setTheme(savedTheme);
-
-if (themeToggle) {
-  themeToggle.addEventListener('click', () => {
-    const current = html.getAttribute('data-theme');
-    setTheme(current === 'dark' ? 'light' : 'dark');
-  });
-}
-
-// Navbar Scroll Effect
-const navbar = document.getElementById('navbar');
-window.addEventListener('scroll', () => {
-  if (navbar) {
-    navbar.classList.toggle('scrolled', window.scrollY > 60);
-  }
+themeToggle.addEventListener('click', () => {
+    const theme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
 });
 
-// Mobile Menu Toggle
-const navBurger = document.getElementById('navBurger');
-const navLinks = document.getElementById('navLinks');
+// Navbar scroll effect
+const navbar = document.querySelector('.nav');
+let lastScroll = 0;
 
-if (navBurger && navLinks) {
-  navBurger.addEventListener('click', () => {
-    navLinks.classList.toggle('open');
-    document.body.style.overflow = navLinks.classList.contains('open') ? 'hidden' : '';
-  });
-  navLinks.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', () => {
-      navLinks.classList.remove('open');
-      document.body.style.overflow = '';
+window.addEventListener('scroll', () => {
+    const currentScroll = window.pageYOffset;
+    
+    if (currentScroll <= 0) {
+        navbar.classList.remove('scroll-up');
+        return;
+    }
+    
+    if (currentScroll > lastScroll && !navbar.classList.contains('scroll-down')) {
+        navbar.classList.remove('scroll-up');
+        navbar.classList.add('scroll-down');
+    } else if (currentScroll < lastScroll && navbar.classList.contains('scroll-down')) {
+        navbar.classList.remove('scroll-down');
+        navbar.classList.add('scroll-up');
+    }
+    lastScroll = currentScroll;
+});
+
+// Mobile menu toggle
+const menuToggle = document.querySelector('.menu-toggle');
+const navLinks = document.querySelector('.nav-links');
+
+if (menuToggle && navLinks) {
+    menuToggle.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+        menuToggle.classList.toggle('active');
     });
-  });
 }
 
-// Scroll Animations
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.style.animation = 'fadeInUp 0.6s ease forwards';
-      entry.target.style.opacity = '1';
-    }
-  });
-}, { threshold: 0.1 });
+// Animate elements on scroll
+const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -100px 0px'
+};
 
-document.querySelectorAll('.cat-card, .product-card, .why-card').forEach(el => {
-  el.style.opacity = '0';
-  observer.observe(el);
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.style.opacity = '1';
+            entry.target.style.transform = 'translateY(0)';
+        }
+    });
+}, observerOptions);
+
+document.querySelectorAll('.cat-card, .product-card, .why-card').forEach((el => {
+    el.style.opacity = '0';
+    observer.observe(el);
 });
 
 // Active nav link
 const currentPage = window.location.pathname.split('/').pop();
 document.querySelectorAll('.nav-link').forEach(link => {
-  const href = link.getAttribute('href');
-  if (href && href.includes(currentPage) && currentPage !== '') {
-    link.classList.add('active');
-  } else if (currentPage === '' || currentPage === 'index.html') {
-    if (href === 'index.html') link.classList.add('active');
-  }
+    const href = link.getAttribute('href');
+    if (href && href.includes(currentPage) && currentPage !== '') {
+        link.classList.add('active');
+    } else if (currentPage === '' || currentPage === 'index.html') {
+        if (href === 'index.html') link.classList.add('active');
+    }
 });
 
-console.log('🚀 NEXORA loaded successfully!');
+console.log('✓ NEXORA loaded successfully!');
+
+// Load and Display Products
+async function loadProducts() {
+    try {
+        const response = await fetch('products.json');
+        const products = await response.json();
+        displayProducts(products);
+    } catch (error) {
+        console.error('Error loading products:', error);
+    }
+}
+
+function displayProducts(products) {
+    const container = document.getElementById('products-grid');
+    if (!container) return;
+    
+    const featuredProducts = products.filter(p => p.category === 'featured');
+    
+    container.innerHTML = featuredProducts.map(product => `
+        <div class="product-card">
+            ${product.image ? `<img src="${product.image}" alt="${product.title}" class="product-img">` : ''}
+            <div class="product-content">
+                <h3 class="product-title">${product.title}</h3>
+                <div class="product-rating">
+                    <span class="stars">★★★★★</span>
+                    <span class="rating-text">${product.rating} (${product.reviews} reviews)</span>
+                </div>
+                <div class="product-footer">
+                    <span class="product-price">${product.price}</span>
+                    <a href="${product.url}" target="_blank" rel="noopener noreferrer" class="product-btn">View Deal</a>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Load products when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadProducts);
+} else {
+    loadProducts();
+}
