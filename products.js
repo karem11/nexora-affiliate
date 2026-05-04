@@ -8,84 +8,84 @@ const PRODUCTS = [
     stars: "★★★★★",
     rating: "4.8",
     reviews: "12,847",
-    affiliateLink: "https://amzn.to/4teaa0I=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B08F7DTL2Z?tag=kareemelsay0a-20"
   },
   {
     id: 2,
     title: "Slow Feeder Dog Bowl – Anti-Bloat Puzzle Bowl for Dogs",
     category: "pets",
     badge: "new",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE2L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/71a2LdyxKzL._AC_SL1500_.jpg",
     stars: "★★★★☆",
     rating: "4.6",
     reviews: "8,234",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE2?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B07FNSQ3ZC?tag=kareemelsay0a-20"
   },
   {
     id: 3,
     title: "GPS Dog Tracker – Real-Time Location AirTag Pet Collar",
     category: "pets",
     badge: "hot",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE3L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/61YZvNpCijL._AC_SL1500_.jpg",
     stars: "★★★★★",
     rating: "4.7",
     reviews: "5,621",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE3?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B09JFLYDZZ?tag=kareemelsay0a-20"
   },
   {
     id: 4,
     title: "LED Face Mask – Red Light Therapy Skin Rejuvenation Device",
     category: "beauty",
     badge: "hot",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE4L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/61lLhXB8XWL._AC_SL1500_.jpg",
     stars: "★★★★★",
     rating: "4.5",
     reviews: "9,102",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE4?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B09WQDX97T?tag=kareemelsay0a-20"
   },
   {
     id: 5,
     title: "Jade Roller & Gua Sha Set – Face Massager Skincare Tool",
     category: "beauty",
     badge: "new",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE5L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/71KcpwHVFFL._AC_SL1500_.jpg",
     stars: "★★★★☆",
     rating: "4.4",
     reviews: "23,456",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE5?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B07NXWZFXM?tag=kareemelsay0a-20"
   },
   {
     id: 6,
-    title: "Desk Organizer Set – Bamboo Desktop Storage with Drawers",
+    title: "Bamboo Desk Organizer Set – Desktop Storage with Drawers",
     category: "home",
     badge: "",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE6L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/81SKeFaadqL._AC_SL1500_.jpg",
     stars: "★★★★★",
     rating: "4.9",
     reviews: "7,890",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE6?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B08BX4QHM5?tag=kareemelsay0a-20"
   },
   {
     id: 7,
     title: "Magnetic Cable Organizer – Under Desk Cable Management",
     category: "tech",
     badge: "new",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE7L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/71yASN9kkUL._AC_SL1500_.jpg",
     stars: "★★★★☆",
     rating: "4.3",
     reviews: "4,567",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE7?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B07YTRG9TH?tag=kareemelsay0a-20"
   },
   {
     id: 8,
     title: "Lick Mat for Dogs & Cats – Slow Feeder Anxiety Relief",
     category: "pets",
     badge: "",
-    image: "https://images-na.ssl-images-amazon.com/images/I/71EXAMPLE8L._AC_SL1500_.jpg",
+    image: "https://images-na.ssl-images-amazon.com/images/I/71V0mh-8x8L._AC_SL1500_.jpg",
     stars: "★★★★★",
     rating: "4.7",
     reviews: "31,200",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE8?tag=kareemelsay0a-20"
+    affiliateLink: "https://www.amazon.com/dp/B09NQTXX72?tag=kareemelsay0a-20"
   }
 ];
 
@@ -101,7 +101,7 @@ function renderProducts(filter) {
     <div class="product-card">
       <div class="product-img-wrap">
         ${p.badge ? `<span class="product-badge ${p.badge}">${p.badge.toUpperCase()}</span>` : ''}
-        <img src="${p.image}" alt="${p.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x200/16161f/6c63ff?text=NEXORA'" />
+        <img src="${p.image}" alt="${p.title}" loading="lazy" onerror="this.src='https://placehold.co/300x200/16161f/6c63ff?text=NEXORA'" />
       </div>
       <div class="product-body">
         <span class="product-cat">${p.category}</span>
