@@ -1,370 +1,302 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-NEXORA Amazon Product Scraper v2 - Playwright Edition
-======================================================
-السكريبت ده بيفتح Chrome حقيقي ويسحب بيانات المنتج من Amazon تلقائياً:
-  - اسم المنتج
-  - السعر الحالي
-  - الصورة الرئيسية بأعلى جودة
-  - التقييم وعدد الريفيوز
-  - أهم مميزات المنتج
-  - بيولّد كود HTML جاهز تحطه في الموقع
-
-التشغيل:
-  pip install playwright
-  playwright install chromium
-  python amazon_scraper.py
+NEXORA Amazon Product Scraper v3 - Fixed Unicode Edition
+Scrapes Amazon product data using Playwright and generates HTML cards.
 """
 
+import asyncio
+import json
 import re
 import sys
-import json
-import time
-import random
-import asyncio
 from pathlib import Path
+from datetime import datetime
 
 try:
-    from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+    from playwright.async_api import async_playwright
 except ImportError:
-    print("[!] Playwright مش مثبّت. شغّل الأمر ده:")
-    print("    pip install playwright && playwright install chromium")
+    print("[!] playwright not installed. Run: pip install playwright && playwright install chromium")
     sys.exit(1)
 
-# ============================================================
-# الإعدادات
-# ============================================================
-AFFILIATE_TAG = "kareemelsay0a-20"
-HEADLESS = False   # False = بيفتح نافذة Chrome تشوفها, True = بيشتغل في الخلفية
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    print("[!] beautifulsoup4 not installed. Run: pip install beautifulsoup4")
+    sys.exit(1)
 
 
-# ============================================================
-# دوال مساعدة
-# ============================================================
-
-def extract_asin(url: str) -> str | None:
-    """استخرج ASIN من أي رابط Amazon"""
-    m = re.search(r'/dp/([A-Z0-9]{10})', url)
-    if not m:
-        m = re.search(r'/gp/product/([A-Z0-9]{10})', url)
-    if not m:
-        m = re.search(r'[?&]asin=([A-Z0-9]{10})', url)
-    return m.group(1) if m else None
+def clean_text(text):
+    """Remove surrogate characters and clean text for UTF-8 encoding."""
+    if not text:
+        return ""
+    # Remove surrogate characters
+    text = text.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+    # Remove non-printable characters except newlines
+    text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]', '', text)
+    return text.strip()
 
 
-def build_affiliate_url(asin: str) -> str:
-    return f"https://www.amazon.com/dp/{asin}?tag={AFFILIATE_TAG}&linkCode=ogi&th=1&psc=1"
-
-
-def rating_to_stars(rating: str) -> str:
-    try:
-        r = float(rating)
-    except (ValueError, TypeError):
-        return "\u2605\u2605\u2605\u2605\u2606"
-    full  = int(r)
-    half  = 1 if (r - full) >= 0.5 else 0
-    empty = 5 - full - half
-    return "\u2605" * full + ("\u00bd" if half else "") + "\u2606" * empty
-
-
-def guess_category(title: str) -> tuple:
-    t = title.lower()
-    if any(w in t for w in ["pet","dog","cat","collar","leash","paw","bird","fish","aquarium"]):
-        return "\ud83d\udc3e Pets", "pets"
-    if any(w in t for w in ["beauty","skin","hair","lip","serum","cream","makeup","face","moisturizer","perfume","fragrance"]):
-        return "\u2728 Beauty", "beauty"
-    if any(w in t for w in ["phone","laptop","usb","cable","wireless","bluetooth","speaker","headphone","earphone","earbuds","monitor","keyboard","mouse","camera","tablet","charger","battery","alexa","echo","kindle","gaming","router"]):
-        return "\u26a1 Tech", "tech"
-    return "\ud83c\udfe0 Home", "home"
-
-
-# ============================================================
-# السكريبت الرئيسي
-# ============================================================
-
-async def scrape_amazon(url: str) -> dict | None:
-    asin = extract_asin(url)
-    if not asin:
-        print("[!] مش قادر ألاقي ASIN في الرابط ده")
-        print("    تأكد إن الرابط من Amazon وفيه /dp/XXXXXXXXXX")
-        return None
-
-    affiliate_url = build_affiliate_url(asin)
-    print(f"[*] ASIN: {asin}")
-    print(f"[*] URL:  {affiliate_url}")
-    print("[*] جاري فتح المتصفح...")
-
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=HEADLESS,
+async def scrape_amazon_product(url):
+    """Scrape product data from Amazon using Playwright."""
+    print(f"[*] Opening Amazon product page...")
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=False,
             args=[
-                "--no-sandbox",
-                "--disable-blink-features=AutomationControlled",
-                "--lang=en-US",
+                '--no-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
             ]
         )
-
-        ctx = await browser.new_context(
-            locale="en-US",
-            timezone_id="America/New_York",
-            viewport={"width": 1366, "height": 768},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"}
+        
+        context = await browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            viewport={'width': 1280, 'height': 800},
+            locale='en-US',
         )
-
-        # تعطيل علامات الأتمتة
-        await ctx.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            window.chrome = { runtime: {} };
-        """)
-
-        page = await ctx.new_page()
-
-        # ضبط cookies عشان يظهر بالدولار الأمريكي
-        await ctx.add_cookies([
-            {"name": "i18n-prefs", "value": "USD",   "domain": ".amazon.com", "path": "/"},
-            {"name": "lc-main",   "value": "en_US", "domain": ".amazon.com", "path": "/"},
-        ])
-
-        print("[*] جاري تحميل صفحة المنتج...")
-        try:
-            await page.goto(affiliate_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(random.randint(2000, 3500))
-        except PlaywrightTimeout:
-            print("[!] انتهت مدة الانتظار. جرب تاني أو تأكد من الاتصال.")
-            await browser.close()
-            return None
-
-        # ---- استخراج الاسم ----
-        title = ""
-        for sel in ["#productTitle", "h1#title span", "span.product-title-word-break"]:
-            el = page.locator(sel).first
-            if await el.count():
-                title = (await el.inner_text()).strip()
-                break
-        print(f"[+] الاسم: {title[:70]}...")
-
-        # ---- استخراج السعر ----
-        price = ""
-        for sel in [
-            ".a-price.a-text-price.a-size-medium .a-offscreen",
-            "#apex_desktop .a-price .a-offscreen",
-            "#corePrice_desktop .a-offscreen",
-            "#priceblock_ourprice",
-            "#priceblock_dealprice",
-            ".a-price-whole",
-        ]:
-            try:
-                el = page.locator(sel).first
-                if await el.count():
-                    raw = (await el.inner_text()).strip()
-                    if "$" in raw or raw.replace(",","").replace(".","").isdigit():
-                        price = raw.replace("\n","").strip()
-                        break
-            except Exception:
-                continue
-        print(f"[+] السعر: {price}")
-
-        # ---- استخراج التقييم ----
-        rating = ""
-        review_count = ""
-        try:
-            r_el = page.locator("#acrPopover").first
-            if await r_el.count():
-                title_attr = await r_el.get_attribute("title")
-                if title_attr:
-                    m = re.search(r"([\d\.]+)", title_attr)
-                    if m:
-                        rating = m.group(1)
-        except Exception:
-            pass
-
-        try:
-            cnt_el = page.locator("#acrCustomerReviewText").first
-            if await cnt_el.count():
-                review_count = (await cnt_el.inner_text()).strip().replace(",","").split()[0]
-        except Exception:
-            pass
-        print(f"[+] التقييم: {rating} ({review_count} reviews)")
-
-        # ---- استخراج الصورة بأعلى جودة ----
-        image_url = ""
-        try:
-            # محاولة 1: من JS data (أعلى جودة)
-            img_data = await page.evaluate("""
-                () => {
-                    const scripts = document.querySelectorAll('script[type="text/javascript"]');
-                    for (const s of scripts) {
-                        if (s.innerText && s.innerText.includes('ImageBlockATF')) {
-                            const m = s.innerText.match(/"hiRes":"(https:[^"]+)"/);
-                            if (m) return m[1];
-                            const m2 = s.innerText.match(/"large":"(https:\/\/m\.media-amazon[^"]+)"/);
-                            if (m2) return m2[1];
-                        }
-                    }
-                    return null;
-                }
-            """)
-            if img_data:
-                image_url = img_data
-        except Exception:
-            pass
-
-        # محاولة 2: من landingImage
-        if not image_url:
-            try:
-                img_el = page.locator("#landingImage").first
-                if await img_el.count():
-                    src = await img_el.get_attribute("data-old-hires")
-                    if not src:
-                        src = await img_el.get_attribute("src")
-                    if src:
-                        # رفع الجودة لـ SL1500
-                        image_url = re.sub(r'_[A-Z]{2}\d+_', '_SL1500_', src)
-            except Exception:
-                pass
-
-        # محاولة 3: أول صورة في قسم الصور
-        if not image_url:
-            try:
-                img_el = page.locator("#imgTagWrapperId img").first
-                if await img_el.count():
-                    image_url = await img_el.get_attribute("src") or ""
-            except Exception:
-                pass
-
-        print(f"[+] الصورة: {image_url[:80]}...")
-
-        # ---- استخراج مميزات المنتج ----
+        
+        page = await context.new_page()
+        
+        print(f"[*] Navigating to URL...")
+        await page.goto(url, wait_until='domcontentloaded', timeout=60000)
+        await asyncio.sleep(3)
+        
+        # Get page content
+        content = await page.content()
+        soup = BeautifulSoup(content, 'html.parser')
+        
+        product = {}
+        
+        # --- Title ---
+        title_el = soup.select_one('#productTitle')
+        product['title'] = clean_text(title_el.get_text()) if title_el else 'Unknown Product'
+        
+        # --- Price ---
+        price = ''
+        price_whole = soup.select_one('.a-price-whole')
+        price_frac = soup.select_one('.a-price-fraction')
+        if price_whole:
+            whole = clean_text(price_whole.get_text()).replace(',', '').replace('.', '')
+            frac = clean_text(price_frac.get_text()) if price_frac else '00'
+            price = f"${whole}.{frac}"
+        if not price:
+            price_el = soup.select_one('#priceblock_ourprice, #priceblock_dealprice, .a-offscreen')
+            if price_el:
+                price = clean_text(price_el.get_text())
+        product['price'] = price or 'Check on Amazon'
+        
+        # --- Rating ---
+        rating_el = soup.select_one('#acrPopover, [data-hook="average-star-rating"]')
+        if rating_el:
+            rating_text = clean_text(rating_el.get('title', '') or rating_el.get_text())
+            match = re.search(r'([\d\.]+)', rating_text)
+            product['rating'] = match.group(1) if match else '4.5'
+        else:
+            product['rating'] = '4.5'
+        
+        # --- Review Count ---
+        reviews_el = soup.select_one('#acrCustomerReviewText')
+        if reviews_el:
+            reviews_text = clean_text(reviews_el.get_text())
+            match = re.search(r'([\d,]+)', reviews_text)
+            product['reviews'] = match.group(1) if match else '0'
+        else:
+            product['reviews'] = '0'
+        
+        # --- Image ---
+        image_url = ''
+        # Try main image first
+        img_el = soup.select_one('#landingImage, #imgBlkFront, #main-image')
+        if img_el:
+            image_url = img_el.get('src') or img_el.get('data-src') or ''
+            # Try high-res data attribute
+            data_dynamic = img_el.get('data-a-dynamic-image', '')
+            if data_dynamic:
+                try:
+                    img_data = json.loads(data_dynamic)
+                    # Get the largest image
+                    best_url = max(img_data.keys(), key=lambda k: img_data[k][0] * img_data[k][1])
+                    image_url = best_url
+                except Exception:
+                    pass
+        
+        # Fallback: look in scripts for image URLs
+        if not image_url or 'data:image' in image_url:
+            scripts = soup.find_all('script')
+            for script in scripts:
+                script_text = script.get_text() if script.string else ''
+                match = re.search(r'"large":"(https://[^"]+\.jpg)"', script_text)
+                if match:
+                    image_url = match.group(1)
+                    break
+        
+        product['image'] = clean_text(image_url)
+        
+        # --- Bullet Points ---
         bullets = []
-        try:
-            items = await page.locator("#feature-bullets li span.a-list-item").all_inner_texts()
-            for b in items[:5]:
-                b = b.strip()
-                if b and "Make sure" not in b and len(b) > 10:
-                    bullets.append(b)
-        except Exception:
-            pass
-
+        bullet_els = soup.select('#feature-bullets li span.a-list-item')
+        for b in bullet_els[:5]:
+            text = clean_text(b.get_text())
+            if text and len(text) > 5:
+                bullets.append(text[:120])
+        product['bullets'] = bullets
+        
+        # --- ASIN ---
+        asin_match = re.search(r'/dp/([A-Z0-9]{10})', url)
+        product['asin'] = asin_match.group(1) if asin_match else ''
+        
+        # --- Category (guess from title) ---
+        title_lower = product['title'].lower()
+        if any(w in title_lower for w in ['rice cooker', 'cooker', 'air fryer', 'blender', 'coffee', 'kitchen', 'instant pot']):
+            product['category'] = 'kitchen'
+        elif any(w in title_lower for w in ['laptop', 'phone', 'tablet', 'headphone', 'speaker', 'camera', 'watch', 'monitor']):
+            product['category'] = 'electronics'
+        elif any(w in title_lower for w in ['vitamin', 'supplement', 'protein', 'health', 'fitness', 'gym']):
+            product['category'] = 'health'
+        elif any(w in title_lower for w in ['book', 'novel', 'guide']):
+            product['category'] = 'books'
+        else:
+            product['category'] = 'featured'
+        
+        product['url'] = url
+        product['scraped_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        
         await browser.close()
-
-    # ---- تجميع البيانات ----
-    price_clean = re.sub(r'[^\d\.]', '', price) if price else "Check Amazon"
-
-    product = {
-        "asin":          asin,
-        "title":         title,
-        "price":         price,
-        "price_clean":   price_clean,
-        "rating":        rating,
-        "review_count":  review_count,
-        "image":         image_url,
-        "bullets":       bullets,
-        "affiliate_url": affiliate_url,
-    }
-    return product
+        return product
 
 
-def generate_html_card(p: dict) -> str:
-    """ولّد كارد HTML بالـ classes الصح للموقع"""
-    badge_cat, _ = guess_category(p["title"])
-    stars        = rating_to_stars(p["rating"])
-    short_title  = p["title"][:120] + ("..." if len(p["title"]) > 120 else "")
-    price_display = f"${p['price_clean']}" if p['price_clean'] != "Check Amazon" else "Check Amazon"
-
-    # badge type
-    badge_class = "hot"
-    badge_label = "\ud83d\udd25 Hot"
-
-    card = f"""      <!-- PRODUCT: {p['asin']} -->
-      <div class="product-card">
-        <div class="product-img-wrap">
-          <img src="{p['image']}" alt="{short_title}" loading="lazy"/>
-          <span class="product-badge {badge_class}">{badge_label}</span>
-        </div>
-        <div class="product-body">
-          <span class="product-cat">{badge_cat}</span>
-          <h3 class="product-title">{short_title}</h3>
-          <div class="product-stars">
-            <span class="stars">{stars}</span>
-            <span class="rating-count">{p['rating']} ({p['review_count']} reviews)</span>
-          </div>
-        </div>
-        <div class="product-footer">
-          <div>
-            <div class="product-price">{price_display}</div>
-            <div class="price-note">Free Prime Shipping</div>
-          </div>
-          <a href="{p['affiliate_url']}" class="btn-amazon" target="_blank" rel="noopener noreferrer">\ud83d\uded2 Buy Now</a>
-        </div>
-      </div>"""
+def generate_html_card(product):
+    """Generate HTML product card."""
+    stars = ''
+    try:
+        rating = float(product.get('rating', 0))
+        full_stars = int(rating)
+        half_star = 1 if (rating - full_stars) >= 0.5 else 0
+        stars = ('&#9733;' * full_stars) + ('&#9734;' * half_star)
+    except Exception:
+        stars = '&#9733;&#9733;&#9733;&#9733;&#9734;'
+    
+    bullets_html = ''
+    for b in product.get('bullets', []):
+        safe_b = b.replace('<', '&lt;').replace('>', '&gt;')
+        bullets_html += f'<li>{safe_b}</li>\n'
+    
+    safe_title = product['title'].replace('<', '&lt;').replace('>', '&gt;')
+    safe_price = product['price'].replace('<', '&lt;').replace('>', '&gt;')
+    
+    card = f'''<!-- PRODUCT CARD: {safe_title[:50]} -->
+<div class="product-card">
+  <div class="product-img-wrap">
+    <img src="{product['image']}" alt="{safe_title[:80]}" loading="lazy" />
+  </div>
+  <div class="product-body">
+    <h3 class="product-title">{safe_title[:100]}</h3>
+    <div class="product-rating">
+      <span class="stars">{stars}</span>
+      <span class="reviews">({product['reviews']} reviews)</span>
+    </div>
+    <ul class="product-bullets">
+{bullets_html}    </ul>
+  </div>
+  <div class="product-footer">
+    <span class="product-price">{safe_price}</span>
+    <a href="{product['url']}" target="_blank" rel="nofollow noopener" class="btn-buy">View on Amazon</a>
+  </div>
+</div>'''
     return card
 
 
 async def main():
-    print("\n" + "="*60)
-    print("  NEXORA - Amazon Scraper v2 (Playwright)")
-    print("="*60)
-    print("  الصق رابط المنتج من Amazon (رابط الأفلييت أو العادي)")
-    print("  مثال: https://www.amazon.com/dp/B0FXNXR46R...")
-    print("="*60)
-
-    url = input("\n[?] رابط المنتج: ").strip()
+    print("="*55)
+    print("  NEXORA Amazon Product Scraper v3")
+    print("="*55)
+    
+    url = input("\n[?] Paste Amazon product URL: ").strip()
     if not url:
-        print("[!] لازم تحط رابط")
-        sys.exit(1)
-
-    product = await scrape_amazon(url)
-    if not product:
-        print("\n[!] فشل السحب. جرب تاني.")
-        sys.exit(1)
-
-    print("\n" + "="*60)
-    print("  النتيجة:")
-    print("="*60)
-    print(f"  الاسم:      {product['title'][:65]}...")
-    print(f"  السعر:      {product['price']}")
-    print(f"  التقييم:    {product['rating']} ({product['review_count']} reviews)")
-    print(f"  الصورة:     {product['image'][:70]}...")
-    if product['bullets']:
-        print(f"  المميزات:")
-        for b in product['bullets']:
-            print(f"    - {b[:80]}")
-    print("="*60)
-
-    # توليد كود HTML
+        print("[!] No URL provided. Exiting.")
+        return
+    
+    # Clean URL - remove tracking params but keep ASIN
+    asin_match = re.search(r'/dp/([A-Z0-9]{10})', url)
+    if asin_match:
+        asin = asin_match.group(1)
+        clean_url = f"https://www.amazon.com/dp/{asin}?tag=kareemelsay0b-20"
+        print(f"[+] ASIN detected: {asin}")
+        print(f"[+] Affiliate URL: {clean_url}")
+    else:
+        clean_url = url
+        print("[!] Could not detect ASIN, using URL as-is")
+    
+    try:
+        product = await scrape_amazon_product(clean_url)
+    except Exception as e:
+        print(f"[!] Scraping error: {e}")
+        return
+    
+    # Print results
+    print("\n" + "="*55)
+    print("  SCRAPED PRODUCT DATA")
+    print("="*55)
+    print(f"Title:    {product['title'][:70]}")
+    print(f"Price:    {product['price']}")
+    print(f"Rating:   {product['rating']} ({product['reviews']} reviews)")
+    print(f"Image:    {product['image'][:60]}..." if product['image'] else "Image:    Not found")
+    print(f"Category: {product['category']}")
+    print(f"Bullets:")
+    for b in product['bullets']:
+        print(f"  - {b[:80]}")
+    
+    # Save JSON
+    out_dir = Path("nexora_products")
+    out_dir.mkdir(exist_ok=True)
+    
+    asin_id = product.get('asin', 'unknown')
+    out_json = out_dir / f"{asin_id}.json"
+    out_html = out_dir / f"{asin_id}_card.html"
+    
+    # Save JSON with utf-8 encoding and ignore errors
+    with open(out_json, 'w', encoding='utf-8', errors='ignore') as f:
+        json.dump(product, f, ensure_ascii=False, indent=2)
+    
+    # Generate HTML card
     html_card = generate_html_card(product)
-
-    # حفظ في ملف HTML
-    out_html = Path(f"product_{product['asin']}.html")
-    out_html.write_text(
-        f"""<!-- ================================================
-     انسخ الكود ده وحطه في index.html
-     داخل: <div class="products-grid">
-================================================ -->\n"""
-        + html_card + "\n<!-- ================================================ -->\n",
-        encoding="utf-8"
-    )
-
-    # حفظ JSON
-    out_json = Path(f"product_{product['asin']}.json")
-    out_json.write_text(json.dumps(product, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    print(f"\n[+] تم الحفظ في: {out_html}")
-    print(f"[+] بيانات JSON:  {out_json}")
-    print("\n" + "="*60)
-    print("  كود HTML الجاهز (انسخه وحطه في index.html):")
-    print("="*60)
+    
+    # Save full HTML file with utf-8 encoding
+    full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Card - {product['title'][:50]}</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }}
+    .product-card {{ background: white; border-radius: 12px; padding: 20px; max-width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+    .product-img-wrap img {{ width: 100%; border-radius: 8px; }}
+    .product-title {{ font-size: 16px; font-weight: bold; margin: 10px 0; }}
+    .stars {{ color: #f5a623; font-size: 18px; }}
+    .product-price {{ font-size: 22px; font-weight: bold; color: #e44d26; }}
+    .btn-buy {{ display: inline-block; background: #ff9900; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 10px; }}
+    .product-bullets {{ font-size: 13px; padding-left: 18px; }}
+    .product-footer {{ margin-top: 15px; display: flex; align-items: center; gap: 15px; }}
+  </style>
+</head>
+<body>
+{html_card}
+</body>
+</html>"""
+    
+    with open(out_html, 'w', encoding='utf-8', errors='ignore') as f:
+        f.write(full_html)
+    
+    print(f"\n[+] Saved JSON: {out_json}")
+    print(f"[+] Saved HTML: {out_html}")
+    print(f"\n[+] HTML Card (copy this to index.html -> products-grid):")
+    print("="*55)
     print(html_card)
-    print("="*60)
-    print("\n[+] خطوات إضافة المنتج للموقع:")
-    print("  1. افتح github.com/karem11/nexora-affiliate")
-    print("  2. افتح index.html > أيقونة القلم")
-    print('  3. دوّر على: <div class="products-grid">')
-    print("  4. ألصق الكارد جوّاه")
-    print("  5. اضغط Commit changes")
-    print("  6. الموقع يتحدث خلال 30 ثانية!")
+    print("="*55)
+    print(f"\n[+] Done! Add the card above inside <div class=\"products-grid\"> in your index.html")
+    print(f"[+] Category for this product: {product['category']}")
 
 
 if __name__ == "__main__":
