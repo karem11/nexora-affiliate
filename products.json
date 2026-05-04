@@ -17,5 +17,18 @@
     "category": "featured",
     "id": "20260504220733",
     "added_at": "2026-05-04 22:07"
+  },
+  {
+    "title": "Unknown Product",
+    "price": "Check on Amazon",
+    "rating": "4.5",
+    "reviews": "0",
+    "image": "",
+    "bullets": [],
+    "asin": "",
+    "url": "https://amzn.to/42f3tQQ",
+    "category": "featured",
+    "id": "20260504234348",
+    "added_at": "2026-05-04 23:43"
   }
 ]
