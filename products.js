@@ -8,7 +8,7 @@ const PRODUCTS = [
     stars: "★★★★★",
     rating: "4.8",
     reviews: "12,847",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE1?tag=YOUR-TAG-20"
+    affiliateLink: "https://amzn.to/4teaa0I=kareemelsay0a-20"
   },
   {
     id: 2,
@@ -19,7 +19,7 @@ const PRODUCTS = [
     stars: "★★★★☆",
     rating: "4.6",
     reviews: "8,234",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE2?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE2?tag=kareemelsay0a-20"
   },
   {
     id: 3,
@@ -30,7 +30,7 @@ const PRODUCTS = [
     stars: "★★★★★",
     rating: "4.7",
     reviews: "5,621",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE3?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE3?tag=kareemelsay0a-20"
   },
   {
     id: 4,
@@ -41,7 +41,7 @@ const PRODUCTS = [
     stars: "★★★★★",
     rating: "4.5",
     reviews: "9,102",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE4?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE4?tag=kareemelsay0a-20"
   },
   {
     id: 5,
@@ -52,7 +52,7 @@ const PRODUCTS = [
     stars: "★★★★☆",
     rating: "4.4",
     reviews: "23,456",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE5?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE5?tag=kareemelsay0a-20"
   },
   {
     id: 6,
@@ -63,7 +63,7 @@ const PRODUCTS = [
     stars: "★★★★★",
     rating: "4.9",
     reviews: "7,890",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE6?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE6?tag=kareemelsay0a-20"
   },
   {
     id: 7,
@@ -74,7 +74,7 @@ const PRODUCTS = [
     stars: "★★★★☆",
     rating: "4.3",
     reviews: "4,567",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE7?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE7?tag=kareemelsay0a-20"
   },
   {
     id: 8,
@@ -85,7 +85,7 @@ const PRODUCTS = [
     stars: "★★★★★",
     rating: "4.7",
     reviews: "31,200",
-    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE8?tag=YOUR-TAG-20"
+    affiliateLink: "https://www.amazon.com/dp/B08EXAMPLE8?tag=kareemelsay0a-20"
   }
 ];
 
