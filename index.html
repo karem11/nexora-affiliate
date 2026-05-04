@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NEXORA – Smart Finds. Better Life.</title>
-  <meta name="description" content="Discover trending products handpicked for your lifestyle."/>
-  /png" href="assets/favicon.png"/>
-  //fonts.googleapis.com"/>
-  //fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-  "/>
+  <title>NEXORA - Smart Finds. Better Life.</title>
+  <meta name="description" content="Discover trending products handpicked for your lifestyle. Smart shopping made simple."/>
+  <link rel="icon" type="image/png" href="assets/favicon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
@@ -31,22 +32,151 @@
     </div>
     <div class="nav-actions">
       <button class="theme-toggle" id="themeToggle">🌙</button>
-      <button class="nav-burger" id="navBurger" aria-label="Menu">
+      <button class="nav-burger" id="navBurger">
         <span></span><span></span><span></span>
       </button>
     </div>
   </div>
 </nav>
 
+<main>
+
 <section class="hero">
   <div class="hero-bg"></div>
   <div class="hero-inner">
     <div class="hero-content">
       <div class="hero-badge">✦ Trending Now</div>
-      <h1 class="hero-title">Smart Finds.<br/><span class="gradient-text">Better Life.</span></h1>
+      <h1 class="hero-title">
+        <span class="gradient-text">Smart Finds.</span><br/>
+        <span class="gradient-text-alt">Better Life.</span>
+      </h1>
       <p class="hero-sub">Handpicked trending products from Amazon — tested, reviewed, and curated just for you.</p>
       <div class="hero-btns">
         <a href="#featured" class="btn btn-primary">🛒 Explore Products</a>
         <a href="category.html?cat=pets" class="btn btn-ghost">Browse Categories</a>
       </div>
-      <div class="hero-stats">
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-value">5K+</div>
+        <div class="stat-label">Products</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">4.8★</div>
+        <div class="stat-label">Avg Rating</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">50K+</div>
+        <div class="stat-label">Happy Shoppers</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="categories">
+  <div class="container">
+    <div class="section-header">
+      <h2 class="section-title">Shop by Category</h2>
+      <p class="section-sub">Find exactly what you need</p>
+    </div>
+    <div class="categories-grid">
+      <a href="category.html?cat=pets" class="category-card">
+        <div class="category-icon">🐾</div>
+        <h3>Pets</h3>
+        <p>Toys, grooming & more</p>
+      </a>
+      <a href="category.html?cat=beauty" class="category-card">
+        <div class="category-icon">💄</div>
+        <h3>Beauty</h3>
+        <p>Skincare & cosmetics</p>
+      </a>
+      <a href="category.html?cat=home" class="category-card">
+        <div class="category-icon">🏠</div>
+        <h3>Home</h3>
+        <p>Decor & essentials</p>
+      </a>
+      <a href="category.html?cat=tech" class="category-card">
+        <div class="category-icon">⚡</div>
+        <h3>Tech</h3>
+        <p>Gadgets & electronics</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section-header" id="featured">
+  <div class="container">
+    <h2 class="section-title">Featured Products</h2>
+    <p class="section-sub">Our top picks this week</p>
+  </div>
+</section>
+
+<!-- PRODUCTS-START -->
+<!-- Products will be auto-inserted here by admin panel -->
+<!-- PRODUCTS-END -->
+
+<section class="why-grid">
+  <div class="container">
+    <div class="section-header">
+      <h2 class="section-title">Why NEXORA?</h2>
+    </div>
+    <div class="why-cards">
+      <div class="why-card">
+        <span class="why-icon">✓</span>
+        <h3>Curated Daily</h3>
+        <p>We scan Amazon to find you the best products every day.</p>
+      </div>
+      <div class="why-card">
+        <span class="why-icon">💰</span>
+        <h3>Honest Picks</h3>
+        <p>Every product is verified with real reviews & ratings.</p>
+      </div>
+      <div class="why-card">
+        <span class="why-icon">🚀</span>
+        <h3>Best Prices</h3>
+        <p>Direct Amazon links — you get the lowest price.</p>
+      </div>
+      <div class="why-card">
+        <span class="why-icon">♥</span>
+        <h3>Safe Shopping</h3>
+        <p>All links go directly to Amazon — secure checkout.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <img src="https://f.top4top.io/p_3776hn9nu1.png" alt="NEXORA" style="height:38px;margin-bottom:12px;"/>
+        <p>Smart Finds. Better Life.</p>
+      </div>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Categories</h4>
+        <a href="category.html?cat=pets">Pets</a>
+        <a href="category.html?cat=beauty">Beauty</a>
+        <a href="category.html?cat=home">Home</a>
+        <a href="category.html?cat=tech">Tech</a>
+      </div>
+      <div class="footer-col">
+        <h4>Info</h4>
+        <a href="disclosure.html">Affiliate Disclosure</a>
+        <a href="privacy.html">Privacy Policy</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; 2026 NEXORA. All rights reserved.</p>
+    <p class="footer-disclaimer">NEXORA is a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com.</p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+
+</body>
+</html>
