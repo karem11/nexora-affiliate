@@ -55,6 +55,22 @@ async def scrape_amazon_product(url):
             viewport={'width': 1280, 'height': 800},
             locale='en-US',
         )
+            
+    # Force US site - prevent redirect to Egypt
+    await context.add_cookies([
+        {
+            'name': 'lc-acbeg',
+            'value': 'en_US',
+            'domain': '.amazon.com',
+            'path': '/'
+        },
+        {
+            'name': 'i18n-prefs',
+            'value': 'USD',
+            'domain': '.amazon.com',
+            'path': '/'
+        }
+    ])
         
         page = await context.new_page()
         
