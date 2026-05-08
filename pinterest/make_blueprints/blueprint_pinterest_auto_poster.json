@@ -1,0 +1,287 @@
+{
+  "name": "NEXORA — Pinterest Auto-Poster (2 accounts)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:SearchRows",
+      "version": 4,
+      "parameters": {
+        "__IMTCONN__": 0
+      },
+      "filter": {
+        "name": "ready & due now",
+        "conditions": [
+          [
+            {
+              "a": "{{1.`status`}}",
+              "b": "ready",
+              "o": "text:equal"
+            }
+          ],
+          [
+            {
+              "a": "{{formatDate(now; \"YYYY-MM-DD HH:mm:ss\")}}",
+              "b": "{{1.`publish_at`}}",
+              "o": "text:greaterorequal"
+            }
+          ]
+        ]
+      },
+      "mapper": {
+        "from": "drive",
+        "mode": "select",
+        "spreadsheetId": "REPLACE_WITH_YOUR_SHEET_ID",
+        "sheetId": "Sheet1",
+        "includesHeaders": true,
+        "filter": {
+          "and": [
+            {
+              "field": "status",
+              "operator": "is",
+              "value": "ready"
+            }
+          ]
+        },
+        "valueRenderOption": "FORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING"
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "messages": [
+            {
+              "category": "instructions",
+              "severity": "info",
+              "message": "Replace REPLACE_WITH_YOUR_SHEET_ID with the ID of your Google Sheet (the long string in the URL between /d/ and /edit)."
+            }
+          ]
+        },
+        "expect": [
+          { "name": "id", "type": "text" },
+          { "name": "account_key", "type": "text" },
+          { "name": "category", "type": "text" },
+          { "name": "image_url", "type": "url" },
+          { "name": "title", "type": "text" },
+          { "name": "description", "type": "text" },
+          { "name": "destination_url", "type": "url" },
+          { "name": "board_name", "type": "text" },
+          { "name": "publish_at", "type": "text" },
+          { "name": "status", "type": "text" }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "pinterest2:createPin",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": 0
+              },
+              "filter": {
+                "name": "Account 1 (Morning)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.`account_key`}}",
+                      "b": "account1_morning",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "boardId": "REPLACE_WITH_BOARD_ID_ACCOUNT1",
+                "title": "{{1.`title`}}",
+                "description": "{{1.`description`}}",
+                "link": "{{1.`destination_url`}}",
+                "altText": "{{1.`title`}}",
+                "media_source": {
+                  "source_type": "image_url",
+                  "url": "{{1.`image_url`}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": -100,
+                  "messages": [
+                    {
+                      "category": "instructions",
+                      "severity": "info",
+                      "message": "Connect your Pinterest Account 1 (Morning) here. After connecting, the Board dropdown will let you pick the destination board."
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": 4,
+              "module": "google-sheets:UpdateaRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": 0
+              },
+              "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "REPLACE_WITH_YOUR_SHEET_ID",
+                "sheetId": "Sheet1",
+                "includesHeaders": true,
+                "rowNumber": "{{1.`__ROW_NUMBER__`}}",
+                "values": {
+                  "0": "{{1.`id`}}",
+                  "1": "{{1.`account_key`}}",
+                  "2": "{{1.`category`}}",
+                  "3": "{{1.`style`}}",
+                  "4": "{{1.`is_hot`}}",
+                  "5": "{{1.`image_url`}}",
+                  "6": "{{1.`image_thumb_url`}}",
+                  "7": "{{1.`title`}}",
+                  "8": "{{1.`description`}}",
+                  "9": "{{1.`destination_url`}}",
+                  "10": "{{1.`board_name`}}",
+                  "11": "{{1.`publish_at`}}",
+                  "12": "posted",
+                  "13": "{{formatDate(now; \"YYYY-MM-DD HH:mm:ss\")}}",
+                  "14": "{{3.id}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": -100
+                }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "pinterest2:createPin",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": 0
+              },
+              "filter": {
+                "name": "Account 2 (Night)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.`account_key`}}",
+                      "b": "account2_night",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "boardId": "REPLACE_WITH_BOARD_ID_ACCOUNT2",
+                "title": "{{1.`title`}}",
+                "description": "{{1.`description`}}",
+                "link": "{{1.`destination_url`}}",
+                "altText": "{{1.`title`}}",
+                "media_source": {
+                  "source_type": "image_url",
+                  "url": "{{1.`image_url`}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 100,
+                  "messages": [
+                    {
+                      "category": "instructions",
+                      "severity": "info",
+                      "message": "Connect your Pinterest Account 2 (Night) here. Use a different connection from Account 1."
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": 6,
+              "module": "google-sheets:UpdateaRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": 0
+              },
+              "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "REPLACE_WITH_YOUR_SHEET_ID",
+                "sheetId": "Sheet1",
+                "includesHeaders": true,
+                "rowNumber": "{{1.`__ROW_NUMBER__`}}",
+                "values": {
+                  "0": "{{1.`id`}}",
+                  "1": "{{1.`account_key`}}",
+                  "2": "{{1.`category`}}",
+                  "3": "{{1.`style`}}",
+                  "4": "{{1.`is_hot`}}",
+                  "5": "{{1.`image_url`}}",
+                  "6": "{{1.`image_thumb_url`}}",
+                  "7": "{{1.`title`}}",
+                  "8": "{{1.`description`}}",
+                  "9": "{{1.`destination_url`}}",
+                  "10": "{{1.`board_name`}}",
+                  "11": "{{1.`publish_at`}}",
+                  "12": "posted",
+                  "13": "{{formatDate(now; \"YYYY-MM-DD HH:mm:ss\")}}",
+                  "14": "{{5.id}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 100
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com"
+  },
+  "scheduling": {
+    "type": "interval",
+    "interval": 60
+  },
+  "is_paused": true
+}

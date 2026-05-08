@@ -1,0 +1,37 @@
+# NEXORA — Netlify deploy configuration
+#
+# We publish the pre-built `website/` folder as a pure static site.
+# All HTML/CSS/JS in there is generated locally by:
+#   python3 site_builder_v3/builder.py
+#
+# Future phases (Phase 2 AI engine, etc.) will continue to commit a
+# fresh `website/` folder so Netlify only has to serve files.
+
+[build]
+  publish = "website"
+
+# Light security headers — tightened later in Phase 3 / Phase 9.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Cache static assets aggressively
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, must-revalidate"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, must-revalidate"
+
+# HTML pages: short cache so deploys propagate quickly
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=300, must-revalidate"

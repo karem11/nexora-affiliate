@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Node (future use)
+node_modules/
+
+# Generated outputs (large, regenerated)
+pinterest/output/
+pinterest/output_v2/
+pinterest/output_v*/
+
+# AI cache (may contain prompts / sensitive content)
+data/ai_cache.json
+data/ai_images/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Secrets — must never be committed
+.env
+.env.*
+*.secret
+secrets.json
+
+# Build artifacts
+*.zip
+*.tar.gz
+
+# Temp & logs
+*.log
+/tmp/
