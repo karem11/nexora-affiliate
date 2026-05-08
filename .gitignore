@@ -46,3 +46,9 @@ secrets.json
 # Temp & logs
 *.log
 /tmp/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
